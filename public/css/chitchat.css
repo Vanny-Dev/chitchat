@@ -254,6 +254,11 @@ body {
         padding: 0.4rem 0.8rem;
         font-size: 1.5rem;
     }
+
+    .dropdown-menu {
+        position: absolute;
+        top: 103px;
+    }
     
     .chat-footer {
         border-radius: 0;
