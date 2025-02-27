@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protected Page</title>
+    <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/chitchat.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <h1><i class="fas fa-globe"></i> ChitChat</h1>
+            <div class="user-info">
+                <span></span>
+                <i class="fas fa-bars menu-btn"></i></button>
+                <div class="dropdown-menu">
+                    <a href="#"><i class="fas fa-user"></i> Profile</a>
+                    <a href="#"><i class="fas fa-lock"></i> Password</a>
+                    <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                </div>
+            </div>
+            <!-- <button onclick="logout()">Logout</button> -->
+        </header>
+
+        <main class="chat-main">
+            <ul id="messages"></ul>
+        </main>
+
+        <footer class="chat-footer">
+            <form id="form" action="">
+                <input id="input" autocomplete="off" placeholder="Type a message..." />
+                <button type="submit" class="btn send-btn"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </footer>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            $(".menu-btn").click(function (event) {
+                $(".dropdown-menu").toggle();
+                event.stopPropagation();
+            });
+
+            $(document).click(function () {
+                $(".dropdown-menu").hide();
+            });
+        });
+
+        // Check if the user is logged in
+        fetch('/check-auth')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.loggedIn) {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "Not Logged In!",
+                        text: "Redirecting to Login...",
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = "../login/"; // Redirect to login
+                    });
+                }
+            })
+            .catch(error => console.error("Error checking authentication:", error));
+
+
+    </script>
+
+    <!-- chitchat -->
+    <script src="../js/chitchat.js"></script>
+
+    <!-- to avoid accessing chitchat if the user is not logged in -->
+    <!-- <script src="../js/check-auth.js"></script> -->
+
+    <!-- logout function -->
+    <script src="../js/logout.js"></script>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="../js/client.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+</body>
+
+</html>
