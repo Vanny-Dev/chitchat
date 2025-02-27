@@ -42,12 +42,12 @@
     <script>
         $(document).ready(function () {
             $(".menu-btn").click(function (event) {
-                $(".dropdown-menu").toggle();
+                $(".dropdown-menu").toggleClass("visible");
                 event.stopPropagation();
             });
 
             $(document).click(function () {
-                $(".dropdown-menu").hide();
+                $(".dropdown-menu").removeClass("visible");
             });
         });
 
