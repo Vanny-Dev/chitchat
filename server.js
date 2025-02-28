@@ -72,7 +72,11 @@ if (cluster.isPrimary) {
             app.use(cors());
             app.use(bodyParser.json());
             app.use(express.static(join(__dirname, '/public')));
-            app.use(express.static(join(__dirname, '/public/login')));
+            // app.use(express.static(join(__dirname, '/public/login')));
+
+            app.get("/", (req, res) => {
+                res.sendFile(`${__dirname}/public/login/`)
+            })
 
             // Create Express session middleware
             const sessionMiddleware = session({
