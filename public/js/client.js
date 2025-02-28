@@ -1,9 +1,6 @@
 // Socket.IO connection setup with reconnection logic
-import dotenv from 'dotenv';
-dotenv.config();
 
-const socket = io(process.env.BACKEND_URL, {
-    withCredentials: true,
+const socket = io({
     auth: {
         serverOffset: 0
     },
@@ -14,12 +11,6 @@ const socket = io(process.env.BACKEND_URL, {
     reconnectionDelayMax: 5000
 });
 
-// For API calls
-fetch(process.env.BACKEND_URL, {
-    method: 'POST',
-    credentials: 'include',
-    // rest of your configuration
-  });
 
 // DOM Elements
 const form = document.getElementById('form');
