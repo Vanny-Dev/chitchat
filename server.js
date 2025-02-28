@@ -36,7 +36,7 @@ if (cluster.isPrimary) {
     cluster.on('exit', (worker, code, signal) => {
         console.log(`Worker ${worker.process.pid} died`);
         cluster.fork({
-            PORT: worker.process.env.PORT
+            PORT: 3000 //worker.process.env.PORT
         });
     });
 } else {
