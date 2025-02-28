@@ -11,6 +11,8 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import session from 'express-session';
 import sharedSession from 'express-socket.io-session';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -80,7 +82,7 @@ if (cluster.isPrimary) {
 
             // Create Express session middleware
             const sessionMiddleware = session({
-                secret: 'abc123.def456',
+                secret: process.env.SESSION_SECRET,
                 resave: false,
                 saveUninitialized: true,
                 cookie: { secure: false }
