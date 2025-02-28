@@ -17,7 +17,7 @@ dotenv.config();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // MongoDB Connection URI
-const uri = "mongodb+srv://vannydev:vannydev@chitchat.7bqlx.mongodb.net/?retryWrites=true&w=majority&appName=chitchat";
+const uri = process.env.MONGODB_URI;
 
 if (cluster.isPrimary) {
     const numCPUs = availableParallelism();
@@ -67,17 +67,26 @@ if (cluster.isPrimary) {
             const server = createServer(app);
             const io = new Server(server, {
                 connectionStateRecovery: {},
-                adapter: createAdapter()
+                adapter: createAdapter(),
+                cors: {
+                    origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
+                    credentials: true
+                }
             });
 
             // Middleware
-            app.use(cors());
+            //app.use(cors());
+            // Update your CORS configuration
+            app.use(cors({
+                origin: [process.env.FRONTEND_URL, 'http://localhost:5173'], // Add your frontend URLs
+                credentials: true // Enable credentials if using sessions
+            }));
             app.use(bodyParser.json());
             app.use(express.static(join(__dirname, '/public')));
             // app.use(express.static(join(__dirname, '/public/login')));
 
             app.get("/", (req, res) => {
-                res.sendFile(`${__dirname}/public/login/`)
+                res.sendFile(`${__dirname}/public/login/index.html`)
             })
 
             // Create Express session middleware
