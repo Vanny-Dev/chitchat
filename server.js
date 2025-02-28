@@ -27,7 +27,7 @@ if (cluster.isPrimary) {
 
     for (let i = 0; i < numCPUs; i++) {
         cluster.fork({
-            PORT: process.env.PORT + i
+            PORT: 3000 + i
         });
     }
 
