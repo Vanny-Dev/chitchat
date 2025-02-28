@@ -85,7 +85,7 @@ if (cluster.isPrimary) {
                 secret: process.env.SESSION_SECRET,
                 resave: false,
                 saveUninitialized: true,
-                cookie: { secure: false }
+                cookie: { secure: true }
             });
 
             // Use session middleware in Express
