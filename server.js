@@ -11,6 +11,7 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import session from 'express-session';
 import sharedSession from 'express-socket.io-session';
+import path from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,8 +72,15 @@ if (cluster.isPrimary) {
             // Middleware
             app.use(cors());
             app.use(bodyParser.json());
-            app.use(express.static(join(__dirname, '/public')));
-            app.use(express.static(join(__dirname, '/public/login')));
+            //app.use(express.static(join(__dirname, '/public')));
+            // app.use(express.static(join(__dirname, '/public/login')));
+            // Serve static files from the 'public' directory
+            app.use(express.static(path.join(__dirname, 'public')));
+
+            // Route handler for /login
+            app.get('/', (req, res) => {
+                res.sendFile(path.join(__dirname, 'public', 'login', 'index.html'));
+            });
 
             // Create Express session middleware
             const sessionMiddleware = session({
