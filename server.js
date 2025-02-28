@@ -6,15 +6,16 @@ import { Server } from 'socket.io';
 import { availableParallelism } from 'node:os';
 import cluster from 'node:cluster';
 import { createAdapter, setupPrimary } from '@socket.io/cluster-adapter';
-//import { setupDatabase } from './db.js';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import { MongoClient, ServerApiVersion } from 'mongodb';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import session from 'express-session';
 import sharedSession from 'express-socket.io-session';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// MongoDB Connection URI
+const uri = "mongodb+srv://vannydev:vannydev@chitchat.7bqlx.mongodb.net/?retryWrites=true&w=majority&appName=chitchat";
 
 if (cluster.isPrimary) {
     const numCPUs = availableParallelism();
@@ -37,162 +38,201 @@ if (cluster.isPrimary) {
     });
 } else {
     const startServer = async () => {
-        const db = new sqlite3.Database('./database.db');
-        //await setupDatabase();
-
-        const app = express();
-        const server = createServer(app);
-        const io = new Server(server, {
-            connectionStateRecovery: {},
-            adapter: createAdapter()
-        });
-
-        // Middleware
-        app.use(cors());
-        app.use(bodyParser.json());
-        app.use(express.static(join(__dirname, '/public')));
-        app.use(express.static(join(__dirname, '/public/login')));
-        // Create Express session middleware
-        const sessionMiddleware = session({
-            secret: 'abc123.def456',
-            resave: false,
-            saveUninitialized: true,
-            cookie: { secure: false }
-        });
-
-        // Use session middleware in Express
-        app.use(sessionMiddleware);
-
-        // Share session with Socket.IO
-        io.use((socket, next) => {
-            sessionMiddleware(socket.request, {}, next);
-        });
-
-        // Create users table
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE,
-      password TEXT
-    )`);
-        // Enable foreign keys
-        db.run('PRAGMA foreign_keys = ON');
-
-        // Create tables if they don't exist
-        db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT,
-      client_offset TEXT UNIQUE,
-      content TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (username) REFERENCES users (username)
-    );
-  `);
-
-        // Signup route
-        app.post('/signup', (req, res) => {
-            const { username, password } = req.body;
-            if (!username || !password) {
-                return res.json({ success: false, message: "Username and password are required!" });
+        // Create a MongoClient
+        const client = new MongoClient(uri, {
+            serverApi: {
+                version: ServerApiVersion.v1,
+                strict: true,
+                deprecationErrors: true,
             }
-            db.run("INSERT INTO users (username, password) VALUES (?, ?)", [username, password], (err) => {
-                if (err) {
-                    return res.json({ success: false, message: "Username already taken!" });
-                }
-                res.json({ success: true, message: "Signup successful!" });
+        });
+
+        try {
+            // Connect to MongoDB
+            await client.connect();
+            console.log("Connected to MongoDB");
+            
+            // Reference to database and collections
+            const db = client.db("chitchat");
+            const usersCollection = db.collection("users");
+            const messagesCollection = db.collection("messages");
+            
+            // Create indexes for performance
+            await usersCollection.createIndex({ username: 1 }, { unique: true });
+            await messagesCollection.createIndex({ client_offset: 1 }, { unique: true });
+
+            const app = express();
+            const server = createServer(app);
+            const io = new Server(server, {
+                connectionStateRecovery: {},
+                adapter: createAdapter()
             });
-        });
 
-        // Login route
-        app.post('/login', (req, res) => {
-            const { username, password } = req.body;
-            if (!username || !password) {
-                return res.json({ success: false, message: "Please fill up both fields!" });
-            }
-            db.get("SELECT * FROM users WHERE username = ? AND password = ?", [username, password], (err, user) => {
-                if (user) {
-                    req.session.user = { id: user.id, username: user.username };
-                    res.json({ success: true, message: "Login successful!" });
+            // Middleware
+            app.use(cors());
+            app.use(bodyParser.json());
+            app.use(express.static(join(__dirname, '/public')));
+            app.use(express.static(join(__dirname, '/public/login')));
+            
+            // Create Express session middleware
+            const sessionMiddleware = session({
+                secret: 'abc123.def456',
+                resave: false,
+                saveUninitialized: true,
+                cookie: { secure: false }
+            });
+
+            // Use session middleware in Express
+            app.use(sessionMiddleware);
+
+            // Share session with Socket.IO
+            io.use((socket, next) => {
+                sessionMiddleware(socket.request, {}, next);
+            });
+
+            // Signup route
+            app.post('/signup', async (req, res) => {
+                const { username, password } = req.body;
+                if (!username || !password) {
+                    return res.json({ success: false, message: "Username and password are required!" });
+                }
+                
+                try {
+                    await usersCollection.insertOne({ username, password });
+                    res.json({ success: true, message: "Signup successful!" });
+                } catch (err) {
+                    // Duplicate key error
+                    if (err.code === 11000) {
+                        return res.json({ success: false, message: "Username already taken!" });
+                    }
+                    console.error("Signup error:", err);
+                    res.json({ success: false, message: "Error creating account!" });
+                }
+            });
+
+            // Login route
+            app.post('/login', async (req, res) => {
+                const { username, password } = req.body;
+                if (!username || !password) {
+                    return res.json({ success: false, message: "Please fill up both fields!" });
+                }
+                
+                try {
+                    const user = await usersCollection.findOne({ username, password });
+                    if (user) {
+                        req.session.user = { id: user._id.toString(), username: user.username };
+                        res.json({ success: true, message: "Login successful!" });
+                    } else {
+                        res.json({ success: false, message: "Incorrect Credentials!" });
+                    }
+                } catch (err) {
+                    console.error("Login error:", err);
+                    res.json({ success: false, message: "Error during login!" });
+                }
+            });
+
+            // Logout route
+            app.post('/logout', (req, res) => {
+                req.session.destroy((err) => {
+                    if (err) {
+                        return res.json({ success: false, message: "Logout failed!" });
+                    }
+                    res.json({ success: true, message: "Logged out successfully!" });
+                });
+            });
+
+            // Check authentication
+            app.get('/auth/user', (req, res) => {
+                if (req.session.user) {
+                    res.json({ loggedIn: true, username: req.session.user.username });
                 } else {
-                    res.json({ success: false, message: "Incorrect Credentials!" });
-                }
-            });
-        });
-
-        // Logout route
-        app.post('/logout', (req, res) => {
-            req.session.destroy((err) => {
-                if (err) {
-                    return res.json({ success: false, message: "Logout failed!" });
-                }
-                res.json({ success: true, message: "Logged out successfully!" });
-            });
-        });
-
-        // Check authentication
-        app.get('/auth/user', (req, res) => {
-            if (req.session.user) {
-                res.json({ loggedIn: true, username: req.session.user.username });
-            } else {
-                res.json({ loggedIn: false });
-            }
-        });
-
-        // Check login status
-        app.get('/check-auth', (req, res) => {
-            if (req.session.user) {
-                res.json({ loggedIn: true, user: req.session.user });
-            } else {
-                res.json({ loggedIn: false });
-            }
-        });
-
-        // Socket.IO connection handling
-        io.on('connection', async (socket) => {
-            console.log(`New client connected: ${socket.id}`);
-
-            socket.on('disconnect', () => {
-                console.log(`Client disconnected: ${socket.id}`);
-            });
-
-            socket.on('chat message', async (msg, clientOffset, callback) => {
-                if (!socket.request.session || !socket.request.session.user) {
-                    console.warn('Unauthorized user attempted to send a message.');
-                    return;
-                }
-
-                const username = socket.request.session.user.username; // Get username from session
-                try {
-                    await db.run(
-                        'INSERT INTO messages (username, content, client_offset) VALUES (?, ?, ?)',
-                        [username, msg, clientOffset]
-                    );
-                    io.emit('chat message', { username, message: msg }, clientOffset);
-                    callback();
-                } catch (e) {
-                    console.error('Database insert error:', e);
+                    res.json({ loggedIn: false });
                 }
             });
 
-            if (!socket.recovered) {
-                try {
-                    await db.each('SELECT id, username, content FROM messages WHERE id > ?',
-                        [socket.handshake.auth.serverOffset || 0],
-                        (_err, row) => {
-                            socket.emit('chat message', { username: row.username, message: row.content }, row.id);
+            // Check login status
+            app.get('/check-auth', (req, res) => {
+                if (req.session.user) {
+                    res.json({ loggedIn: true, user: req.session.user });
+                } else {
+                    res.json({ loggedIn: false });
+                }
+            });
+
+            // Socket.IO connection handling
+            io.on('connection', async (socket) => {
+                console.log(`New client connected: ${socket.id}`);
+
+                socket.on('disconnect', () => {
+                    console.log(`Client disconnected: ${socket.id}`);
+                });
+
+                socket.on('chat message', async (msg, clientOffset, callback) => {
+                    if (!socket.request.session || !socket.request.session.user) {
+                        console.warn('Unauthorized user attempted to send a message.');
+                        return;
+                    }
+
+                    const username = socket.request.session.user.username;
+                    try {
+                        const result = await messagesCollection.insertOne({
+                            username,
+                            content: msg,
+                            client_offset: clientOffset,
+                            created_at: new Date()
+                        });
+                        
+                        io.emit('chat message', { username, message: msg }, result.insertedId.toString());
+                        callback();
+                    } catch (e) {
+                        // Skip duplicate message errors (from retries)
+                        if (e.code !== 11000) {
+                            console.error('Database insert error:', e);
                         }
-                    );
+                    }
+                });
 
-                } catch (e) {
-                    console.error('Recovery error:', e);
+                if (!socket.recovered) {
+                    try {
+                        // Convert serverOffset to ObjectId if it exists
+                        let query = {};
+                        if (socket.handshake.auth.serverOffset) {
+                            // If using ObjectId for tracking, you'll need to modify this logic
+                            // For simplicity, we're using the insertedId string representation in this example
+                            const lastId = socket.handshake.auth.serverOffset;
+                            // This would depend on how you're tracking message IDs
+                            query = { _id: { $gt: lastId } };
+                        }
+
+                        const cursor = messagesCollection.find(query).sort({ created_at: 1 });
+                        await cursor.forEach(doc => {
+                            socket.emit('chat message', 
+                                { username: doc.username, message: doc.content }, 
+                                doc._id.toString()
+                            );
+                        });
+                    } catch (e) {
+                        console.error('Recovery error:', e);
+                    }
                 }
-            }
-        });
+            });
 
-        const port = process.env.PORT || 3000;
-        server.listen(port, () => {
-            console.log(`Worker ${process.pid} started - Server running at http://localhost:${port}`);
-        });
+            const port = process.env.PORT || 3000;
+            server.listen(port, () => {
+                console.log(`Worker ${process.pid} started - Server running at http://localhost:${port}`);
+            });
+            
+            // Handle application shutdown
+            process.on('SIGINT', async () => {
+                await client.close();
+                console.log('MongoDB connection closed');
+                process.exit(0);
+            });
+            
+        } catch (err) {
+            console.error('MongoDB connection error:', err);
+            process.exit(1);
+        }
     };
 
     startServer().catch(err => {

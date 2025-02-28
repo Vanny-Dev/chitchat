@@ -1,7 +1,7 @@
 // Socket.IO connection setup with reconnection logic
 const socket = io({
     auth: {
-        serverOffset: 0
+        serverOffset: null // Changed from 0 to null to handle MongoDB ObjectId strings
     },
     ackTimeout: 10000,
     retries: 3,
