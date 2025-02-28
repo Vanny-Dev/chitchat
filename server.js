@@ -12,20 +12,22 @@ import cors from 'cors';
 import session from 'express-session';
 import sharedSession from 'express-socket.io-session';
 import path from 'node:path';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // MongoDB Connection URI
-const uri = "mongodb+srv://vannydev:vannydev@chitchat.7bqlx.mongodb.net/?retryWrites=true&w=majority&appName=chitchat";
+const uri = process.env.MONGODB_URI;
 
 if (cluster.isPrimary) {
-    const numCPUs = availableParallelism();
+    const numCPUs = 1; //availableParallelism()
     console.log(`Primary ${process.pid} is running`);
     console.log(`Starting ${numCPUs} workers...`);
 
     for (let i = 0; i < numCPUs; i++) {
         cluster.fork({
-            PORT: 3000 + i
+            PORT: process.env.PORT + i
         });
     }
 
@@ -72,15 +74,15 @@ if (cluster.isPrimary) {
             // Middleware
             app.use(cors());
             app.use(bodyParser.json());
-            //app.use(express.static(join(__dirname, '/public')));
-            // app.use(express.static(join(__dirname, '/public/login')));
+            app.use(express.static(join(__dirname, '/public')));
+            app.use(express.static(join(__dirname, '/public/login')));
             // Serve static files from the 'public' directory
-            app.use(express.static(path.join(__dirname, 'public')));
+            // app.use(express.static(path.join(__dirname, 'public')));
 
-            // Route handler for /login
-            app.get('/', (req, res) => {
-                res.sendFile(path.join(__dirname, 'public', 'login', 'index.html'));
-            });
+            // // Route handler for /login
+            // app.get('/', (req, res) => {
+            //     res.sendFile(path.join(__dirname, 'public', 'login', 'index.html'));
+            // });
 
             // Create Express session middleware
             const sessionMiddleware = session({
@@ -260,7 +262,7 @@ if (cluster.isPrimary) {
                 }
             });
 
-            const port = process.env.PORT || 3000;
+            const port = process.env.PORT;
             server.listen(port, () => {
                 console.log(`Worker ${process.pid} started - Server running at http://localhost:${port}`);
             });
