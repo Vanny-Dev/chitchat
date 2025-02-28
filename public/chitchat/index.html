@@ -19,17 +19,41 @@
                 <span></span>
                 <i class="fas fa-bars menu-btn"></i></button>
                 <div class="dropdown-menu">
-                    <a href="#"><i class="fas fa-user"></i> Profile</a>
-                    <a href="#"><i class="fas fa-lock"></i> Password</a>
-                    <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    <a class="profile-toggle"><i class="fas fa-user"></i> Profile</a>
+                    <a class="active-users-toggle"><i class="fas fa-users"></i> Users</a>
+                    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
             </div>
             <!-- <button onclick="logout()">Logout</button> -->
         </header>
 
+
+
         <main class="chat-main">
             <ul id="messages"></ul>
         </main>
+
+        <!-- Profile Modal -->
+        <div id="profileModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Your Profile</h2>
+                <div class="profile-info">
+                    <p>Username: <span id="profileUsername"></span></p>
+                </div>
+                <div id="passwordChangeForm" style="display:none;">
+                    <div class="password-inputs">
+                        <input type="password" id="currentPassword" placeholder="Current Password" />
+                        <input type="password" id="newPassword" placeholder="New Password" />
+                        <input type="password" id="confirmPassword" placeholder="Confirm New Password" />
+                    </div>
+                </div>
+                <div class="profile-actions">
+                    <button id="togglePasswordChange" class="btn profile-btn">Change Password</button>
+                    <button id="savePasswordBtn" style="display:none;" class="btn profile-btn save-btn">Save Password</button>
+                </div>
+            </div>
+        </div>
 
         <footer class="chat-footer">
             <form id="form" action="">
@@ -50,6 +74,7 @@
                 $(".dropdown-menu").removeClass("visible");
             });
         });
+
 
         // Check if the user is logged in
         fetch('/check-auth')

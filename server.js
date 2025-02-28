@@ -51,12 +51,12 @@ if (cluster.isPrimary) {
             // Connect to MongoDB
             await client.connect();
             console.log("Connected to MongoDB");
-            
+
             // Reference to database and collections
             const db = client.db("chitchat");
             const usersCollection = db.collection("users");
             const messagesCollection = db.collection("messages");
-            
+
             // Create indexes for performance
             await usersCollection.createIndex({ username: 1 }, { unique: true });
             await messagesCollection.createIndex({ client_offset: 1 }, { unique: true });
@@ -73,7 +73,7 @@ if (cluster.isPrimary) {
             app.use(bodyParser.json());
             app.use(express.static(join(__dirname, '/public')));
             app.use(express.static(join(__dirname, '/public/login')));
-            
+
             // Create Express session middleware
             const sessionMiddleware = session({
                 secret: 'abc123.def456',
@@ -96,7 +96,7 @@ if (cluster.isPrimary) {
                 if (!username || !password) {
                     return res.json({ success: false, message: "Username and password are required!" });
                 }
-                
+
                 try {
                     await usersCollection.insertOne({ username, password });
                     res.json({ success: true, message: "Signup successful!" });
@@ -116,7 +116,7 @@ if (cluster.isPrimary) {
                 if (!username || !password) {
                     return res.json({ success: false, message: "Please fill up both fields!" });
                 }
-                
+
                 try {
                     const user = await usersCollection.findOne({ username, password });
                     if (user) {
@@ -159,6 +159,41 @@ if (cluster.isPrimary) {
                 }
             });
 
+            // Change password route
+            app.post('/change-password', async (req, res) => {
+                if (!req.session.user) {
+                    return res.json({ success: false, message: "Not authenticated!" });
+                }
+
+                const { currentPassword, newPassword } = req.body;
+                if (!currentPassword || !newPassword) {
+                    return res.json({ success: false, message: "Both current and new password are required!" });
+                }
+
+                try {
+                    // Check current password
+                    const user = await usersCollection.findOne({
+                        username: req.session.user.username,
+                        password: currentPassword
+                    });
+
+                    if (!user) {
+                        return res.json({ success: false, message: "Current password is incorrect!" });
+                    }
+
+                    // Update password
+                    await usersCollection.updateOne(
+                        { username: req.session.user.username },
+                        { $set: { password: newPassword } }
+                    );
+
+                    res.json({ success: true, message: "Password changed successfully!" });
+                } catch (err) {
+                    console.error("Password change error:", err);
+                    res.json({ success: false, message: "Error changing password!" });
+                }
+            });
+
             // Socket.IO connection handling
             io.on('connection', async (socket) => {
                 console.log(`New client connected: ${socket.id}`);
@@ -181,7 +216,7 @@ if (cluster.isPrimary) {
                             client_offset: clientOffset,
                             created_at: new Date()
                         });
-                        
+
                         io.emit('chat message', { username, message: msg }, result.insertedId.toString());
                         callback();
                     } catch (e) {
@@ -206,8 +241,8 @@ if (cluster.isPrimary) {
 
                         const cursor = messagesCollection.find(query).sort({ created_at: 1 });
                         await cursor.forEach(doc => {
-                            socket.emit('chat message', 
-                                { username: doc.username, message: doc.content }, 
+                            socket.emit('chat message',
+                                { username: doc.username, message: doc.content },
                                 doc._id.toString()
                             );
                         });
@@ -221,14 +256,14 @@ if (cluster.isPrimary) {
             server.listen(port, () => {
                 console.log(`Worker ${process.pid} started - Server running at http://localhost:${port}`);
             });
-            
+
             // Handle application shutdown
             process.on('SIGINT', async () => {
                 await client.close();
                 console.log('MongoDB connection closed');
                 process.exit(0);
             });
-            
+
         } catch (err) {
             console.error('MongoDB connection error:', err);
             process.exit(1);

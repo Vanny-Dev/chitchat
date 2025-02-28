@@ -1,7 +1,7 @@
 // Socket.IO connection setup with reconnection logic
 const socket = io({
     auth: {
-        serverOffset: null // Changed from 0 to null to handle MongoDB ObjectId strings
+        serverOffset: 0
     },
     ackTimeout: 10000,
     retries: 3,
@@ -149,3 +149,145 @@ setInterval(() => {
         }
     }
 }, 60000); // Run every minute
+
+// Profile modal functionality
+$(document).ready(function() {
+    const profileModal = document.getElementById('profileModal');
+    const profileToggle = document.querySelector('.profile-toggle');
+    const closeModal = document.querySelector('.close-modal');
+    const togglePasswordBtn = document.getElementById('togglePasswordChange');
+    const passwordForm = document.getElementById('passwordChangeForm');
+    const savePasswordBtn = document.getElementById('savePasswordBtn');
+    const profileUsername = document.getElementById('profileUsername');
+    
+    // Show modal when profile is clicked
+    profileToggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Get current user data
+        fetch('/auth/user')
+            .then(response => response.json())
+            .then(data => {
+                if (data.loggedIn) {
+                    profileUsername.textContent = data.username;
+                    profileModal.style.display = 'block';
+                }
+            })
+            .catch(error => console.error('Error fetching user data:', error));
+    });
+    
+    // Close modal when X is clicked
+    closeModal.addEventListener('click', function() {
+        profileModal.style.display = 'none';
+        // Reset password form
+        passwordForm.style.display = 'none';
+        savePasswordBtn.style.display = 'none';
+        togglePasswordBtn.textContent = 'Change Password';
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+    });
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', function(e) {
+        if (e.target === profileModal) {
+            profileModal.style.display = 'none';
+            // Reset password form
+            passwordForm.style.display = 'none';
+            savePasswordBtn.style.display = 'none';
+            togglePasswordBtn.textContent = 'Change Password';
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        }
+    });
+    
+    // Toggle password change form
+    togglePasswordBtn.addEventListener('click', function() {
+        if (passwordForm.style.display === 'none') {
+            passwordForm.style.display = 'block';
+            savePasswordBtn.style.display = 'block';
+            togglePasswordBtn.textContent = 'Cancel';
+            togglePasswordBtn.style.backgroundColor = 'red';
+        } else {
+            passwordForm.style.display = 'none';
+            savePasswordBtn.style.display = 'none';
+            togglePasswordBtn.textContent = 'Change Password';
+            togglePasswordBtn.style.backgroundColor = '#4e54c8';
+            // Clear inputs
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        }
+    });
+    
+    // Handle password change
+    savePasswordBtn.addEventListener('click', function() {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        // Simple validation
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'All fields are required!'
+            });
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'New passwords do not match!'
+            });
+            return;
+        }
+        
+        // Send password change request to server
+        fetch('/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                currentPassword,
+                newPassword
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: 'Password changed successfully!'
+                });
+                
+                // Reset and close form
+                passwordForm.style.display = 'none';
+                savePasswordBtn.style.display = 'none';
+                togglePasswordBtn.textContent = 'Change Password';
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message || 'Failed to change password!'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error changing password:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Something went wrong. Please try again.'
+            });
+        });
+    });
+});
